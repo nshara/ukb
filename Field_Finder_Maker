@@ -1,0 +1,37 @@
+##To make a field finder for UK Biobank dataset using R
+##Last used: 2019
+##First need to use ukbconv on ukbXXXXX.enc_ukb docs to generate html file
+
+# Read in the html file
+html<-fread('$htmlfile.html', header=F, sep='&')
+
+# Extract rows containing the table
+html<-html[(which(grepl('</a></th><th>Type</th><th>Description',html$V1))+2):(which(html$V1 == '</table>')[2]-1),]
+
+# Extract variable codes
+html$V2<-gsub('.*/field.cgi\\?id=','', html$V1)
+html$V2<-gsub('</a></td><td.*','', html$V2)
+html$ID_1<-gsub('.*">','', html$V2)
+html$ID_2<-gsub('">.*','', html$V2)
+
+# Extract description column
+html$V3<-gsub('.*rowspan=','', html$V1)
+html$Description<-gsub('<.*','', html$V3)
+html$punct <- gsub('[[:punct:]]', ' ', html$Description)
+html$initial_num <-gsub('^ [[:digit:]]+', '', html$punct)
+html$double_space <-gsub('\\s\\s', '.', html$initial_num)
+html$single_space <-gsub('\\s', '.', html$double_space)
+html$start_cap <- gsub('^[[:punct:]]+', '', html$single_space)
+
+# Add description to all rows of data
+for(i in unique(html$ID_2)){
+  html$start_cap[grepl(i, html$ID_1)]<-html$start_cap[html$ID_1 == paste0(i,'-0.0')]
+}
+
+# Add same suffixes to Description as to field codes
+html$suffix <- gsub('.*-', '.', html$ID_1)
+html$desc <- with(html, paste0(start_cap, suffix))
+
+# Put into clean table, inserting f. to begining of variable ID, and changing '-' to '.' in variable ID)
+clean<-data.frame(row.number=seq(1,length(html$ID_1),1), eid=paste0('f.',gsub('-','.',html$ID_1)), Description=html$desc)
+
